@@ -1,0 +1,69 @@
+{
+    "root": ".",
+    "build_props": "Directory.Build.Props",
+    "variables": {
+        "ModName": "ParallelTasker",
+        "ModDirRelative": "GameData/$(ModName)/",
+        "ModDir": "$(SolutionDir)$(ModDirRelative)",
+        "PluginDir": "$(ModDir)Plugins/",
+        "AssetDir": "$(ModDir)Assets/",
+        "KSP_DIR_INSTALL": "C:/Zaidimai/KSP 1.7.0/",
+        "KSPGameData": "$(KSP_DIR_INSTALL)GameData/",
+        "GameDir": "$(KSPGameData)$(ModName)/",
+        "VersionMajor": 1,
+        "VersionMinor": 0,
+        "VersionBuild": 0,
+        "VersionRevision": 0,
+        "Year": 2019,
+        "KSPMajorMin": 1,
+        "KSPMajorMax": 1,
+        "KSPMinorMin": 4,
+        "KSPMinorMax": 7,
+        "UnityDir": "$(SolutionDir)Unity/ParallelTasker/",
+        "Assets": "$(UnityDir)Assets/"
+    },
+    "post_build": {
+        "pdb2mdb": "$(SolutionDir)../KSP Assemblies/pdb2mdb.exe",
+        "clean": [
+            "$(GameDir)"
+        ],
+        "install": {
+            "$(TargetDir)$(TargetName).*": "$(PluginDir)",
+            "$(UnityDir)/AssetBundles/synchronizers.pt": "$(AssetDir)",
+            "GameData/$(ModName)": "$(GameDir)"
+        },
+        "[Unity]": {
+            "clean": [],
+            "install": {
+                "$(TargetDir)$(TargetName).*": "$(Assets)/Plugins/"
+            }
+        }
+    },
+    "replace": {
+        "regex": {
+            "**/*.cs": {
+                "[Cc]opyright (\\d+)": "$(Year)"
+            },
+            "$(ModName)/Properties/AssemblyInfo.cs": {
+                "Copyright .* (\\d+)": "$(Year)"
+            }
+        },
+        "template_files": {
+            "$(ModDir)$(ModName).version.in": "$(ModDir)$(ModName).version"
+        }
+    },
+    "package": {
+        "compression": "deflated",
+        "filename": "$(ModName)_$(VersionMajor).$(VersionMinor).$(VersionBuild).$(VersionRevision).zip",
+        "output_dir": "$(SolutionDir)releases",
+        "include": [
+            "$(ModDirRelative)**/*",
+            "LICENSE"
+        ],
+        "exclude": [
+            "$(ModDirRelative)**/*db",
+            "$(ModDirRelative)**/*.in",
+            "$(ModDirRelative)**/*.dll.*"
+        ]
+    }
+}

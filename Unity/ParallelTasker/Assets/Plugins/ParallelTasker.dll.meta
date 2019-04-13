@@ -1,0 +1,36 @@
+fileFormatVersion: 2
+guid: c841a2080af6fad48b714870e3233fab
+timeCreated: 1555187091
+licenseType: Free
+PluginImporter:
+  serializedVersion: 2
+  iconMap: {}
+  executionOrder:
+    ParallelTasker.PTEndSynchronizer: 8000
+    ParallelTasker.PTStartSynchronizer: -8000
+  isPreloaded: 0
+  isOverridable: 0
+  platformData:
+    data:
+      first:
+        Any: 
+      second:
+        enabled: 1
+        settings: {}
+    data:
+      first:
+        Editor: Editor
+      second:
+        enabled: 0
+        settings:
+          DefaultValueInitialized: true
+    data:
+      first:
+        Windows Store Apps: WindowsStoreApps
+      second:
+        enabled: 0
+        settings:
+          CPU: AnyCPU
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

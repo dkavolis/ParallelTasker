@@ -1,0 +1,25 @@
+{
+  "NAME"     : "$(ModName)",
+  "DOWNLOAD" : "https://github.com/dkavolis/$(ModName)/releases",
+  "URL"      : "https://raw.githubusercontent.com/dkavolis/$(ModName)/master/GameData/$(ModName)/$(ModName).version",
+  "GITHUB" : {
+    "USERNAME"   : "dkavolis",
+    "REPOSITORY" : "$(ModName)"
+  },
+  "VERSION" : {
+    "MAJOR" : $(VersionMajor),
+    "MINOR" : $(VersionMinor),
+    "PATCH" : $(VersionBuild),
+    "BUILD" : $(VersionRevision)
+  },
+  "KSP_VERSION_MIN" : {
+    "MAJOR" : $(KSPMajorMin),
+    "MINOR" : $(KSPMinorMin),
+    "PATCH" : 0
+  },
+  "KSP_VERSION_MAX" : {
+    "MAJOR" : $(KSPMajorMax),
+    "MINOR" : $(KSPMinorMax),
+    "PATCH" : 99
+  }
+}
