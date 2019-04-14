@@ -171,20 +171,52 @@ namespace ParallelTasker
 
         public PTThreadTask RunInitializer()
         {
-            argument = initialize?.Invoke();
+            try
+            {
+                argument = initialize?.Invoke();
+            }
+            catch (Exception ex)
+            {
+                main = NoopMain;
+                finalize = NoopFinalizer;
+                PTLogger.Exception(ex);
+            }
             return this;
         }
 
         public PTThreadTask RunMainTask()
         {
-            argument = main?.Invoke(argument);
+            try
+            {
+                argument = main?.Invoke(argument);
+            }
+            catch (Exception ex)
+            {
+                finalize = NoopFinalizer;
+                PTLogger.Exception(ex);
+            }
             return this;
         }
 
         public void RunFinalizer()
         {
-            finalize?.Invoke(argument);
+            try
+            {
+                finalize?.Invoke(argument);
+            }
+            catch (Exception ex)
+            {
+                PTLogger.Exception(ex);
+            }
             Release();
         }
+
+        private static object NoopMain(object argument)
+        {
+            return null;
+        }
+
+        private static void NoopFinalizer(object argument)
+        { }
     }
 }
