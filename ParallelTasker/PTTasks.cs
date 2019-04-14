@@ -193,7 +193,7 @@ namespace ParallelTasker
             catch (Exception ex)
             {
                 finalize = NoopFinalizer;
-                PTLogger.Exception(ex);
+                PTController.Instance.Loggers[group].LogException(ex);
             }
             return this;
         }
