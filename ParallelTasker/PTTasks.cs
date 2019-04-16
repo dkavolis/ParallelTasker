@@ -43,19 +43,19 @@ namespace ParallelTasker
             return task;
         }
 
-        public PTTask AddTask(PTGroup group, Func<object, object> main)
+        public PTTask AddTask(PTGroup group, Func<object, object> main, uint period = 1)
         {
-            return AddTask(group, PTTask.Get(null, main, null));
+            return AddTask(group, PTTask.Get(null, main, null, period));
         }
 
-        public PTTask AddTask(PTGroup group, Func<object> initialize, Func<object, object> main)
+        public PTTask AddTask(PTGroup group, Func<object> initialize, Func<object, object> main, uint period = 1)
         {
-            return AddTask(group, PTTask.Get(initialize, main, null));
+            return AddTask(group, PTTask.Get(initialize, main, null, period));
         }
 
-        public PTTask AddTask(PTGroup group, Func<object> initialize, Func<object, object> main, Action<object> finalize)
+        public PTTask AddTask(PTGroup group, Func<object> initialize, Func<object, object> main, Action<object> finalize, uint period = 1)
         {
-            return AddTask(group, PTTask.Get(initialize, main, finalize));
+            return AddTask(group, PTTask.Get(initialize, main, finalize, period));
         }
 
         public void ClearTasks()
@@ -84,14 +84,37 @@ namespace ParallelTasker
         public Func<object> initialize;
         public Func<object, object> main;
         public Action<object> finalize;
+        public uint period;
+        private uint counter;
 
         public PTTask() : this(null, null, null)
         { }
-        public PTTask(Func<object> initialize, Func<object, object> main, Action<object> finalize)
+        public PTTask(Func<object> initialize, Func<object, object> main, Action<object> finalize, uint period = 1)
         {
             this.initialize = initialize;
             this.main = main;
             this.finalize = finalize;
+            this.period = period;
+            counter = period;
+        }
+
+        public bool ShouldExecuteNext()
+        {
+            return counter == period;
+        }
+
+        internal bool ShouldExecute()
+        {
+            if (counter == period)
+            {
+                counter = 1;
+                return true;
+            }
+            else
+            {
+                counter++;
+            }
+            return false;
         }
 
         protected static void OnRelease(PTTask task)
@@ -99,14 +122,17 @@ namespace ParallelTasker
             task.initialize = null;
             task.main = null;
             task.finalize = null;
+            task.period = 0;
         }
 
-        public static PTTask Get(Func<object> initialize, Func<object, object> main, Action<object> finalize)
+        public static PTTask Get(Func<object> initialize, Func<object, object> main, Action<object> finalize, uint period = 1)
         {
             var task = s_pool.Get();
             task.initialize = initialize;
             task.main = main;
             task.finalize = finalize;
+            task.period = period;
+            task.counter = 1;
             return task;
         }
 

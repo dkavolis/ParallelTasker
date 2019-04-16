@@ -8,10 +8,10 @@ The API can be found in a static `ParallelTasker` class and contains methods for
 
 * `bool ResetTasksOnSceneChange`: a property to disable/enable task clearing on scene changes (KSP) to be used in case some tasks rely on `GameObject`s that may no longer be available in different scenes. Default: `true`
 * `PTTask AddTask(PTGroup group, PTTask task)`: add a task `task` to be executed in timing group `group`, returns the added task, in this case `task`
-* `PTTask AddTask(PTGroup group, Func<object, object> task)`: add a task with no `initialize` and `finalize` to the current task list. Returns the added task.
-* `PTTask AddTask(PTGroup group, Func<object> initializer, Func<object, object> task)`: add a task with `finalize` to the current task list. Returns the added task.
-* `PTTask AddTask(PTGroup group, Func<object, object> task, Action<object> finalizer)`: add a task with no `initialize` to the current task list. Returns the added task.
-* `PTTask AddTask(PTGroup group, Func<object> initializer, Func<object, object> task, Action<object> finalizer)`: add a complete task to the current task list. Returns the added task.
+* `PTTask AddTask(PTGroup group, Func<object, object> task, uint period)`: add a task with no `initialize` and `finalize` with execution period `period` to the current task list. Returns the added task.
+* `PTTask AddTask(PTGroup group, Func<object> initializer, Func<object, object> task, uint period)`: add a task with `finalize` with execution period `period` to the current task list. Returns the added task.
+* `PTTask AddTask(PTGroup group, Func<object, object> task, Action<object> finalizer, uint period)`: add a task with no `initialize` with execution period `period` to the current task list. Returns the added task.
+* `PTTask AddTask(PTGroup group, Func<object> initializer, Func<object, object> task, Action<object> finalizer, uint period)`: add a complete task with execution period `period` to the current task list. Returns the added task.
 * `bool RemoveTask(PTGroup group, PTTask task)`: remove `task` from `group` task list. Returns success/failure of removal.
 * `bool RemoveTask(PTGroup group, Func<object, object> task)`: remove the first task with `PTTask.main == task` from the `group` task list. Returns success/failure of removal.
 * `void Log(PTGroup group, object message)`: log a normal `message` in `group` logger.
@@ -39,8 +39,9 @@ Tasks in `Frame` groups are started after and finished before corresponding sing
 
 ## Tasks
 
-Each task [`PTTask`](https://github.com/dkavolis/ParallelTasker/blob/master/ParallelTasker/PTTasks.cs) can be queued for any of the timing groups and consists of 3 functions:
+Each task [`PTTask`](https://github.com/dkavolis/ParallelTasker/blob/master/ParallelTasker/PTTasks.cs) can be queued for any of the timing groups and consists of 3 functions and an unsigned integer:
 
-* `Func<object> initialize`: a function that returns `object`, guaranteed to run before any other task function. This can be used to copy data from the main thread to be passed to `main`. It is always executed on the main thread.
+* `Func<object> initialize` (optional): a function that returns `object`, guaranteed to run before any other task function. This can be used to copy data from the main thread to be passed to `main`. It is always executed on the main thread.
 * `Func<object, object> main`: a function that takes a single `object` (from `initialize`) as an argument and returns `object`. This function is executed in a different thread and thus should be made thread safe. Guaranteed to run after `initialize` and before `finalize` of this task.
-* `Action<object> finalize`: a void function that takes a single `object` (from `main`) as an argument, guaranteed to be executed after `initialize` and `main`. Always executed on the main thread. This can be used to copy data from the thread back to the main thread.
+* `Action<object> finalize` (optional): a void function that takes a single `object` (from `main`) as an argument, guaranteed to be executed after `initialize` and `main`. Always executed on the main thread. This can be used to copy data from the thread back to the main thread.
+* `uint period`: how often this task is executed, i.e. `period` of 1 will execute this task on every Update event. Default: 1.
