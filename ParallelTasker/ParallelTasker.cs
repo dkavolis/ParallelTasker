@@ -36,24 +36,24 @@ namespace ParallelTasker
             }
         }
 
-        public static PTTask AddTask(PTGroup group, Func<object, object> task)
+        public static PTTask AddTask(PTGroup group, Func<object, object> task, uint period = 1)
         {
-            return PTController.Instance.Tasks.AddTask(group, task);
+            return PTController.Instance.Tasks.AddTask(group, task, period);
         }
 
-        public static PTTask AddTask(PTGroup group, Func<object> initializer, Func<object, object> task)
+        public static PTTask AddTask(PTGroup group, Func<object> initializer, Func<object, object> task, uint period = 1)
         {
-            return PTController.Instance.Tasks.AddTask(group, initializer, task);
+            return PTController.Instance.Tasks.AddTask(group, initializer, task, period);
         }
 
-        public static PTTask AddTask(PTGroup group, Func<object, object> task, Action<object> finalizer)
+        public static PTTask AddTask(PTGroup group, Func<object, object> task, Action<object> finalizer, uint period = 1)
         {
-            return PTController.Instance.Tasks.AddTask(group, null, task, finalizer);
+            return PTController.Instance.Tasks.AddTask(group, null, task, finalizer, period);
         }
 
-        public static PTTask AddTask(PTGroup group, Func<object> initializer, Func<object, object> task, Action<object> finalizer)
+        public static PTTask AddTask(PTGroup group, Func<object> initializer, Func<object, object> task, Action<object> finalizer, uint period = 1)
         {
-            return PTController.Instance.Tasks.AddTask(group, initializer, task, finalizer);
+            return PTController.Instance.Tasks.AddTask(group, initializer, task, finalizer, period);
         }
 
         public static PTTask AddTask(PTGroup group, PTTask task)

@@ -127,14 +127,19 @@ namespace ParallelTasker
         private void StartGroupTasks(PTGroup group)
         {
             List<PTTask> tasks = m_tasks[group];
+            int count = 0;
 
             foreach (var task in tasks)
             {
-                var threadTask = PTThreadTask.Get(group, task);
-                m_threadPool.Enqueue(threadTask.RunInitializer());
+                if (task.ShouldExecute())
+                {
+                    var threadTask = PTThreadTask.Get(group, task);
+                    m_threadPool.Enqueue(threadTask.RunInitializer());
+                    count++;
+                }
             }
 
-            m_queuedTasks[group] = tasks.Count;
+            m_queuedTasks[group] = count;
         }
 
         private void EndGroupTasks(PTGroup group)

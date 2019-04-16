@@ -26,6 +26,13 @@ namespace ParallelTasker.Unity
     public class SimpleTaskEditor : Singleton<SimpleTaskEditor>
     {
         private List<SimpleTask> tasks;
+        [SerializeField] uint m_period = 1;
+
+        // float argument to work with slider
+        public void SetPeriod(float value)
+        {
+            m_period = (uint)value;
+        }
 
         protected override void OnAwake()
         {
@@ -65,7 +72,7 @@ namespace ParallelTasker.Unity
         public void NewTask(PTGroup group)
         {
             var task = new SimpleTask(group);
-            ParallelTasker.AddTask(group, task.OnInitialize, task.Execute, task.OnFinalize);
+            ParallelTasker.AddTask(group, task.OnInitialize, task.Execute, task.OnFinalize, m_period);
             Debug.LogWarning($"Added {task}");
             tasks.Add(task);
         }
