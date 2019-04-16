@@ -18,44 +18,52 @@ Copyright 2019, Daumantas Kavolis
 
  */
 
-using System;
-
 namespace ParallelTasker
 {
     public class SimpleTask
     {
-        public readonly string groupString;
-        public readonly PTGroup group;
-        private static int count = 0;
-        private int id;
+        public readonly string StartString, EndString;
+        public readonly PTTimePair Start, End;
+        private static int s_count;
+        private readonly int m_id;
+        private int m_counter;
 
-        public SimpleTask(PTGroup group_)
+        public SimpleTask(PTTimePair start, PTTimePair end)
         {
-            id = count++;
-            group = group_;
-            groupString = Enum.GetName(typeof(PTGroup), group);
+            m_id = s_count++;
+            Start = start;
+            End = end;
+            StartString = start.ToString();
+            EndString = end.ToString();
+            m_counter = 0;
         }
 
         public object OnInitialize()
         {
-            ParallelTasker.Log(group, $"Initializing {this}");
-            return null;
+            m_counter++;
+            ParallelTasker.Log($"Initializing {GetString(m_counter)}");
+            return m_counter;
         }
 
         public object Execute(object arg)
         {
-            ParallelTasker.Log(group, $"Executing {this}");
-            return null;
+            ParallelTasker.Log($"Executing    {GetString((int)arg)}");
+            return arg;
         }
 
         public void OnFinalize(object arg)
         {
-            ParallelTasker.Log(group, $"Finalizing {this}");
+            ParallelTasker.Log($"Finalizing   {GetString((int)arg)}");
         }
 
         public override string ToString()
         {
-            return $"{base.ToString()}({id}, {groupString})";
+            return GetString(m_counter);
+        }
+
+        public string GetString(int counter)
+        {
+            return $"{base.ToString()}({m_id.ToString("D2")}, {counter.ToString("D4")}, {StartString,28} -> {EndString,-28})";
         }
     }
 }

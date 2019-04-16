@@ -26,22 +26,15 @@ namespace ParallelTasker
 {
     public class PTTaskQueue
     {
-        private PTGroupDictQueue<PTThreadTask> m_tasks = new PTGroupDictQueue<PTThreadTask>();
+        private readonly PTGroupDict<Queue<PTThreadTask>> m_tasks = new PTGroupDict<Queue<PTThreadTask>>(pair => new Queue<PTThreadTask>());
 
-        private PTGroup? m_priority = null;
-
-        public PTGroup? Priority
+        public PTTimePair? Priority
         {
-            get
-            {
-                return m_priority;
-            }
-            set
-            {
-                m_priority = value;
-            }
+            get;
+            set;
         }
-        private volatile int m_count = 0;
+
+        private volatile int m_count;
 
         public int Count
         {
@@ -62,37 +55,37 @@ namespace ParallelTasker
         {
             ResetCount();
 #if DEBUG
-            StringBuilder sb = new StringBuilder($"{this} dequeue order:\n");
-            int counter = 0;
+            var sb = new StringBuilder($"{this} dequeue order:\n");
+            var counter = 0;
             foreach (var group in m_tasks.Keys)
-                sb.AppendLine($"  {++counter}. {group}");
+                sb.AppendLine($"  {(++counter).ToString()}. {group.ToString()}");
             PTLogger.Debug(sb.ToString());
 #endif
         }
 
         public void Enqueue(PTThreadTask task)
         {
-            Enqueue(task.group, task);
+            Enqueue(task.EndTime, task);
         }
 
-        internal void Enqueue(PTGroup group, PTThreadTask task)
+        internal void Enqueue(PTTimePair endTime, PTThreadTask task)
         {
-            m_tasks[group].Enqueue(task);
+            m_tasks[endTime].Enqueue(task);
             m_count++;
         }
 
         public PTThreadTask Dequeue()
         {
-            // first try returning tasks from prioritized queue
             try
             {
-                if (m_priority != null)
+                // first try returning tasks from prioritized queue
+                if (Priority != null)
                 {
-                    var priority = (PTGroup)m_priority;
+                    var priority = (PTTimePair)Priority;
                     if (m_tasks[priority].Count > 0)
                         return Dequeue(priority);
                     else
-                        m_priority = null;
+                        Priority = null;
                 }
 
                 foreach (var pair in m_tasks)
@@ -101,28 +94,30 @@ namespace ParallelTasker
                         return Dequeue(pair.Key);
                 }
             }
-            catch (InvalidOperationException e)
+            catch (InvalidOperationException)
             {
                 ResetCount();
-                throw e;
+                throw;
             }
 
             return null;
         }
 
-        private PTThreadTask Dequeue(PTGroup group)
+        private PTThreadTask Dequeue(PTTimePair endTime)
         {
             m_count--;
-            return m_tasks[group].Dequeue();
+            return m_tasks[endTime].Dequeue();
         }
 
         private void ResetCount()
         {
             m_count = 0;
+            var count = 0;
             foreach (var pair in m_tasks)
             {
-                m_count += pair.Value.Count;
+                count += pair.Value.Count;
             }
+            m_count = count;
         }
     }
 }

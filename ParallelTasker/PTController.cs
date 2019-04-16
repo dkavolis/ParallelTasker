@@ -18,154 +18,95 @@ Copyright 2019, Daumantas Kavolis
 
  */
 
-using System.Collections.Generic;
-using System.Threading;
+using System;
 
 namespace ParallelTasker
 {
-    public class PTController : Singleton<PTController>
+    public class PTController : IDisposable
     {
         // setting up everything before instance gets a chance to run anything
-        private static PTThreadPool m_threadPool = new PTThreadPool();
-        private static PTTaskList m_tasks = new PTTaskList();
-        private static PTGroupDictQueue<PTThreadTask> m_toFinalize = new PTGroupDictQueue<PTThreadTask>();
-        private static PTGroupDict<int> m_queuedTasks = new PTGroupDict<int>();
-        private static PTLoggers m_loggers = new PTLoggers();
-        private static object m_lock = new object();
-        private bool m_resetOnSceneChange = true;
-        public static bool ResetOnSceneChange
+        private readonly PTThreadPool m_threadPool;
+
+        // track counters in here so since all TaskGroups queue new tasks through this
+        private readonly PTGroupDict<int> m_counters;
+
+        internal PTGroupDict<PTTaskGroup> Tasks
         {
-            get
-            {
-                return Instance.m_resetOnSceneChange;
-            }
-            set
-            {
-                Instance.m_resetOnSceneChange = value;
-            }
+            get;
         }
 
-        internal PTThreadPool ThreadPool
+        public PTController()
         {
-            get
-            {
-                return m_threadPool;
-            }
+            m_threadPool = new PTThreadPool();
+            Tasks = new PTGroupDict<PTTaskGroup>(pair => new PTTaskGroup(PTAddon.Instance.Synchronizers[pair.EventTime], pair, this));
+            m_counters = new PTGroupDict<int>();
         }
-        internal PTTaskList Tasks
+
+        public void ResetCurrentTasks()
         {
-            get
+            foreach (var tasks in Tasks.Values)
             {
-                return m_tasks;
+                tasks.ClearTasks();
             }
         }
 
-        internal PTLoggers Loggers
+        /// <summary>
+        /// Only ever called from TaskGroup.EndTasks(), threadpool has the lock
+        /// </summary>
+        /// <param name="timePair"></param>
+        public void SetPriority(PTTimePair timePair)
         {
-            get
+            m_threadPool.Prioritize(timePair);
+        }
+
+        /// <summary>
+        /// Only ever called from main thread by TaskGroup.StartTasks()
+        /// </summary>
+        /// <param name="task"></param>
+        internal void Enqueue(PTThreadTask task)
+        {
+            m_threadPool.Enqueue(task);
+            m_counters[task.EndTime]++;
+        }
+
+        /// <summary>
+        /// Can be called from any thread, TaskGroup has the lock
+        /// </summary>
+        /// <param name="finalizer"></param>
+        internal void EnqueueForFinalization(PTThreadTask finalizer)
+        {
+            Tasks[finalizer.EndTime].EnqueueForFinalization(finalizer);
+        }
+
+        /// <summary>
+        /// Called by TaskGroup when finishing its tasks, always on main thread
+        /// </summary>
+        /// <param name="timePair"></param>
+        /// <returns></returns>
+        internal int PopFinalizationCounter(PTTimePair timePair)
+        {
+            var count = m_counters[timePair];
+            m_counters[timePair] = 0;
+            return count;
+        }
+
+        internal void SubscribeFinalizer(PTTimePair timePair)
+        {
+            Tasks[timePair].SubscribeFinalizer();
+        }
+
+        internal void UnsubscribeFinalizer(PTTimePair timePair)
+        {
+            Tasks[timePair].UnsubscribeFinalizer();
+        }
+
+        public void Dispose()
+        {
+            m_threadPool.Dispose();
+            foreach (var group in Tasks.Values)
             {
-                return m_loggers;
+                group.Dispose();
             }
-        }
-
-        public static void ResetCurrentTasks()
-        {
-            m_tasks.ClearTasks();
-        }
-
-        internal void UpdateStart()
-        {
-            PTLogger.DebugSynchronization("Update start");
-            EndGroupTasks(PTGroup.UpdateFrame);
-            StartGroupTasks(PTGroup.Update);
-            StartGroupTasks(PTGroup.UpdateFrame);
-        }
-
-        internal void UpdateEnd()
-        {
-            EndGroupTasks(PTGroup.Update);
-            PTLogger.DebugSynchronization("Update end");
-        }
-
-        internal void LateUpdateStart()
-        {
-            PTLogger.DebugSynchronization("Late Update start");
-            EndGroupTasks(PTGroup.LateUpdateFrame);
-            StartGroupTasks(PTGroup.LateUpdate);
-            StartGroupTasks(PTGroup.LateUpdateFrame);
-        }
-
-        internal void LateUpdateEnd()
-        {
-            EndGroupTasks(PTGroup.LateUpdate);
-            PTLogger.DebugSynchronization("Late Update end");
-        }
-
-        internal void FixedUpdateStart()
-        {
-            PTLogger.DebugSynchronization("Fixed Update start");
-            EndGroupTasks(PTGroup.FixedUpdateFrame);
-            StartGroupTasks(PTGroup.FixedUpdate);
-            StartGroupTasks(PTGroup.FixedUpdateFrame);
-        }
-
-        internal void FixedUpdateEnd()
-        {
-            EndGroupTasks(PTGroup.FixedUpdate);
-            PTLogger.DebugSynchronization("Fixed Update end");
-        }
-
-        internal static void EnqueueForFinalization(PTThreadTask finalizer)
-        {
-            lock(m_lock)
-            {
-                m_toFinalize[finalizer.group].Enqueue(finalizer);
-                Monitor.Pulse(m_lock);
-            }
-        }
-
-        private void StartGroupTasks(PTGroup group)
-        {
-            List<PTTask> tasks = m_tasks[group];
-            int count = 0;
-
-            foreach (var task in tasks)
-            {
-                if (task.ShouldExecute())
-                {
-                    var threadTask = PTThreadTask.Get(group, task);
-                    m_threadPool.Enqueue(threadTask.RunInitializer());
-                    count++;
-                }
-            }
-
-            m_queuedTasks[group] = count;
-        }
-
-        private void EndGroupTasks(PTGroup group)
-        {
-            m_threadPool.Prioritize(group);
-            int toFinalize = m_queuedTasks[group];
-            PTThreadTask finalizer;
-
-            while (toFinalize > 0)
-            {
-                lock(m_lock)
-                {
-                    while (m_toFinalize[group].Count == 0)
-                    {
-                        Monitor.Wait(m_lock);
-                    }
-
-                    finalizer = m_toFinalize[group].Dequeue();
-                }
-
-                finalizer.RunFinalizer();
-
-                toFinalize--;
-            }
-
-            m_loggers[group].Flush();
         }
     }
 }

@@ -25,8 +25,8 @@ namespace ParallelTasker.Unity
 {
     public class SimpleTaskEditor : Singleton<SimpleTaskEditor>
     {
-        private List<SimpleTask> tasks;
-        [SerializeField] uint m_period = 1;
+        private List<SimpleTask> m_tasks;
+        [SerializeField] private uint m_period = 1;
 
         // float argument to work with slider
         public void SetPeriod(float value)
@@ -36,59 +36,67 @@ namespace ParallelTasker.Unity
 
         protected override void OnAwake()
         {
-            tasks = new List<SimpleTask>();
+            m_tasks = new List<SimpleTask>();
         }
 
         public void NewUpdateTask()
         {
-            NewTask(PTGroup.Update);
+            NewTask(new PTTimePair(PTUpdateEvent.Update, PTEventTime.Start), new PTTimePair(PTUpdateEvent.Update, PTEventTime.End));
         }
 
         public void NewLateUpdateTask()
         {
-            NewTask(PTGroup.LateUpdate);
+            NewTask(new PTTimePair(PTUpdateEvent.LateUpdate, PTEventTime.Start), new PTTimePair(PTUpdateEvent.LateUpdate, PTEventTime.End));
         }
 
         public void NewFixedUpdateTask()
         {
-            NewTask(PTGroup.FixedUpdate);
+            NewTask(new PTTimePair(PTUpdateEvent.FixedUpdate, PTEventTime.Start), new PTTimePair(PTUpdateEvent.FixedUpdate, PTEventTime.End));
         }
 
         public void NewUpdateFrameTask()
         {
-            NewTask(PTGroup.UpdateFrame);
+            NewTask(new PTTimePair(PTUpdateEvent.Update, PTEventTime.Start), new PTTimePair(PTUpdateEvent.Update, PTEventTime.Start));
         }
 
         public void NewFixedUpdateFrameTask()
         {
-            NewTask(PTGroup.FixedUpdateFrame);
+            NewTask(new PTTimePair(PTUpdateEvent.FixedUpdate, PTEventTime.Start), new PTTimePair(PTUpdateEvent.FixedUpdate, PTEventTime.Start));
         }
 
         public void NewLateUpdateFrameTask()
         {
-            NewTask(PTGroup.LateUpdateFrame);
+            NewTask(new PTTimePair(PTUpdateEvent.LateUpdate, PTEventTime.Start), new PTTimePair(PTUpdateEvent.LateUpdate, PTEventTime.Start));
         }
 
-        public void NewTask(PTGroup group)
+        public void NewTask(PTTimePair start, PTTimePair end)
         {
-            var task = new SimpleTask(group);
-            ParallelTasker.AddTask(group, task.OnInitialize, task.Execute, task.OnFinalize, m_period);
-            Debug.LogWarning($"Added {task}");
-            tasks.Add(task);
+            var task = new SimpleTask(start, end);
+            ParallelTasker.AddTask(start, end, task.OnInitialize, task.Execute, task.OnFinalize, m_period);
+            PTLogger.Warning($"Added {task}");
+            m_tasks.Add(task);
         }
 
         public void RemoveLastTask()
         {
-            int last = tasks.Count - 1;
+            var last = m_tasks.Count - 1;
             if (last < 0)
                 return;
-            SimpleTask task = tasks[last];
-            if (!ParallelTasker.RemoveTask(task.group, task.Execute))
-                Debug.LogError($"Failed to remove task {task}");
+            var task = m_tasks[last];
+            if (!ParallelTasker.RemoveTask(task.Start, task.Execute))
+                PTLogger.Error($"Failed to remove task {task}");
             else
             {
-                tasks.RemoveAt(last);
+                m_tasks.RemoveAt(last);
+                PTLogger.Warning($"Removed task {task}");
             }
+        }
+
+        public void ClearTasks()
+        {
+            ParallelTasker.ClearTasks();
+            m_tasks.Clear();
+            PTLogger.Warning("Cleared all tasks");
         }
     }
 }

@@ -18,57 +18,36 @@ Copyright 2019, Daumantas Kavolis
 
  */
 
+using System;
 using System.Collections.Generic;
 
 namespace ParallelTasker
 {
-    public class PTGroupDict<T> : Dictionary<PTGroup, T>
+    public class PTGroupDict<T> : Dictionary<PTTimePair, T>
     {
-        public PTGroupDict() : this(0)
+        public PTGroupDict() : this(null)
         { }
-        public PTGroupDict(int capacity) : base()
+        public PTGroupDict(Func<PTTimePair, T> create)
         {
-            Initialize(capacity);
+
+            Initialize(create);
         }
 
-        private void Initialize(int capacity = 0)
+        private void Initialize(Func<PTTimePair, T> create)
         {
-            foreach (var group in PTUtils.GetEnumValues<PTGroup>())
+            var factory = create ?? (pair => default(T));
+            foreach (var group in PTUtils.GetAllTimePairs())
             {
-                this[group] = Default(group, capacity);
+                try
+                {
+                    this[group] = factory(group);
+                }
+                catch (Exception)
+                {
+                    PTLogger.Error($"Error while initializing {this} with {group.ToString()}");
+                    throw;
+                }
             }
-        }
-
-        protected virtual T Default(PTGroup group, int capacity = 0)
-        {
-            return default(T);
-        }
-
-    }
-
-    public class PTGroupDictList<T> : PTGroupDict<List<T>>
-    {
-        protected override List<T> Default(PTGroup group, int capacity = 0)
-        {
-            return new List<T>(capacity);
-        }
-
-    }
-
-    public class PTGroupDictQueue<T> : PTGroupDict<Queue<T>>
-    {
-        protected override Queue<T> Default(PTGroup group, int capacity = 0)
-        {
-            return new Queue<T>(capacity);
-        }
-
-    }
-
-    public class PTLoggers : PTGroupDict<PTGroupLogger>
-    {
-        protected override PTGroupLogger Default(PTGroup group, int capacity = 0)
-        {
-            return new PTGroupLogger(group);
         }
     }
 }

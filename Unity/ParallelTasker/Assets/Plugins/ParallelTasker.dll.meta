@@ -1,19 +1,25 @@
 fileFormatVersion: 2
 guid: c841a2080af6fad48b714870e3233fab
-timeCreated: 1555187091
+timeCreated: 1555365212
 licenseType: Free
 PluginImporter:
   serializedVersion: 2
   iconMap: {}
   executionOrder:
-    ParallelTasker.PTEndSynchronizer: 8000
-    ParallelTasker.PTStartSynchronizer: -8000
+    ParallelTasker.PTSynchronizerEarly: -99
+    ParallelTasker.PTSynchronizerEarlyish: -1
+    ParallelTasker.PTSynchronizerEnd: 8008
+    ParallelTasker.PTSynchronizerFashionablyLate: 7
+    ParallelTasker.PTSynchronizerFlightIntegrator: 9
+    ParallelTasker.PTSynchronizerLate: 19
+    ParallelTasker.PTSynchronizerPrecalc: -101
+    ParallelTasker.PTSynchronizerStart: -8008
   isPreloaded: 0
   isOverridable: 0
   platformData:
     data:
       first:
-        Any: 
+        Any:
       second:
         enabled: 1
         settings: {}
@@ -31,6 +37,6 @@ PluginImporter:
         enabled: 0
         settings:
           CPU: AnyCPU
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
+  userData:
+  assetBundleName:
+  assetBundleVariant:

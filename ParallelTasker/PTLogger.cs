@@ -131,21 +131,25 @@ namespace ParallelTasker
         #endregion // Error
 
         #region Assertion
+        [Conditional("UNITY_ASSERTIONS")]
         public static void Assertion(object message)
         {
             UnityEngine.Debug.LogAssertion(Tag + message);
         }
 
+        [Conditional("UNITY_ASSERTIONS")]
         public static void Assertion(object message, UnityEngine.Object context)
         {
             UnityEngine.Debug.LogAssertion(Tag + message, context);
         }
 
+        [Conditional("UNITY_ASSERTIONS")]
         public static void AssertionFormat(string format, params object[] args)
         {
             UnityEngine.Debug.LogAssertionFormat(Tag + format, args);
         }
 
+        [Conditional("UNITY_ASSERTIONS")]
         public static void AssertionFormat(UnityEngine.Object context, string format, params object[] args)
         {
             UnityEngine.Debug.LogAssertionFormat(context, Tag + format, args);
