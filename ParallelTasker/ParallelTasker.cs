@@ -19,6 +19,7 @@ Copyright 2019, Daumantas Kavolis
  */
 
 using System;
+using System.Diagnostics;
 
 namespace ParallelTasker
 {
@@ -28,112 +29,134 @@ namespace ParallelTasker
         {
             get
             {
-                return PTController.ResetOnSceneChange;
+                return PTAddon.Instance.ResetOnSceneChange;
             }
             set
             {
-                PTController.ResetOnSceneChange = value;
+                PTAddon.Instance.ResetOnSceneChange = value;
             }
         }
 
-        public static PTTask AddTask(PTGroup group, Func<object, object> task, uint period = 1)
+        public static bool SubscriptionStatus(PTTimePair taskGroup)
         {
-            return PTController.Instance.Tasks.AddTask(group, task, period);
+            return PTAddon.Instance.Controller.Tasks[taskGroup].SubscriptionStatus;
         }
 
-        public static PTTask AddTask(PTGroup group, Func<object> initializer, Func<object, object> task, uint period = 1)
+        public static bool SubscriptionStatus(PTUpdateEvent updateEvent, PTEventTime eventTime)
         {
-            return PTController.Instance.Tasks.AddTask(group, initializer, task, period);
+            return SubscriptionStatus(new PTTimePair(updateEvent, eventTime));
         }
 
-        public static PTTask AddTask(PTGroup group, Func<object, object> task, Action<object> finalizer, uint period = 1)
+        public static void Subscribe(PTTimePair timePair, Action handler)
         {
-            return PTController.Instance.Tasks.AddTask(group, null, task, finalizer, period);
+            PTAddon.Instance.Synchronizers[timePair.EventTime].Subscribe(timePair.UpdateEvent, handler);
         }
 
-        public static PTTask AddTask(PTGroup group, Func<object> initializer, Func<object, object> task, Action<object> finalizer, uint period = 1)
+        public static void Subscribe(PTUpdateEvent updateEvent, PTEventTime eventTime, Action handler)
         {
-            return PTController.Instance.Tasks.AddTask(group, initializer, task, finalizer, period);
+            Subscribe(new PTTimePair(updateEvent, eventTime), handler);
         }
 
-        public static PTTask AddTask(PTGroup group, PTTask task)
+        public static void Unsubscribe(PTTimePair timePair, Action handler)
         {
-            return PTController.Instance.Tasks.AddTask(group, task);
+            PTAddon.Instance.Synchronizers[timePair.EventTime].Unsubscribe(timePair.UpdateEvent, handler);
         }
 
-        public static bool RemoveTask(PTGroup group, PTTask task)
+        public static void Unsubscribe(PTUpdateEvent updateEvent, PTEventTime eventTime, Action handler)
         {
-            var tasks = PTController.Instance.Tasks[group];
-            int index = tasks.IndexOf(task);
-            if (index < 0)
-                return false;
-            tasks[index].Release();
-            tasks.RemoveAt(index);
-            return true;
+            Unsubscribe(new PTTimePair(updateEvent, eventTime), handler);
         }
 
-        public static bool RemoveTask(PTGroup group, Func<object, object> task)
+        public static PTTask AddTask(PTTimePair startTime, PTTimePair endTime, Func<object, object> task, uint period = 1)
         {
-            var tasks = PTController.Instance.Tasks[group];
-
-            for (int i = 0; i < tasks.Count; i++)
-            {
-                if (tasks[i] != null)
-                {
-                    if (tasks[i].main == task)
-                    {
-                        tasks[i].Release();
-                        tasks.RemoveAt(i);
-                        return true;
-                    }
-                }
-            }
-            return false;
+            return PTAddon.Instance.Controller.Tasks[startTime].AddTask(endTime, task, period);
         }
 
-        public static void Log(PTGroup group, object message)
+        public static PTTask AddTask(PTTimePair startTime, PTTimePair endTime, Func<object> initializer, Func<object, object> task, uint period = 1)
         {
-            PTController.Instance.Loggers[group].Log(message);
+            return PTAddon.Instance.Controller.Tasks[startTime].AddTask(endTime, initializer, task, period);
         }
 
-        public static void LogFormat(PTGroup group, string format, params object[] args)
+        public static PTTask AddTask(PTTimePair startTime, PTTimePair endTime, Func<object, object> task, Action<object> finalizer, uint period = 1)
         {
-            PTController.Instance.Loggers[group].LogFormat(format, args);
+            return PTAddon.Instance.Controller.Tasks[startTime].AddTask(endTime, null, task, finalizer, period);
         }
 
-        public static void LogError(PTGroup group, object message)
+        public static PTTask AddTask(PTTimePair startTime, PTTimePair endTime, Func<object> initializer, Func<object, object> task, Action<object> finalizer, uint period = 1)
         {
-            PTController.Instance.Loggers[group].LogError(message);
+            return PTAddon.Instance.Controller.Tasks[startTime].AddTask(endTime, initializer, task, finalizer, period);
         }
 
-        public static void LogErrorFormat(PTGroup group, string format, params object[] args)
+        public static PTTask AddTask(PTTimePair startTime, PTTimePair endTime, PTTask task)
         {
-            PTController.Instance.Loggers[group].LogErrorFormat(format, args);
+            return PTAddon.Instance.Controller.Tasks[startTime].AddTask(endTime, task);
         }
 
-        public static void LogWarning(PTGroup group, object message)
+        public static bool RemoveTask(PTTimePair startTime, PTTask task)
         {
-            PTController.Instance.Loggers[group].LogWarning(message);
+            return PTAddon.Instance.Controller.Tasks[startTime].RemoveTask(task);
         }
 
-        public static void LogWarningFormat(PTGroup group, string format, params object[] args)
+        public static bool RemoveTask(PTTimePair startTime, Func<object, object> task)
         {
-            PTController.Instance.Loggers[group].LogWarningFormat(format, args);
+            return PTAddon.Instance.Controller.Tasks[startTime].RemoveTask(task);
         }
 
-        public static void LogException(PTGroup group, Exception exception)
+        [Conditional("DEBUG")]
+        public static void Debug(object message)
         {
-            PTController.Instance.Loggers[group].LogException(exception);
+            PTThreadSafeLogger.Debug(message);
+        }
+
+        [Conditional("DEBUG")]
+        public static void DebugFormat(string format, params object[] args)
+        {
+            PTThreadSafeLogger.DebugFormat(format, args);
+        }
+
+        public static void Log(object message)
+        {
+            PTThreadSafeLogger.Log(message);
+        }
+
+        public static void LogFormat(string format, params object[] args)
+        {
+            PTThreadSafeLogger.LogFormat(format, args);
+        }
+
+        public static void LogError(object message)
+        {
+            PTThreadSafeLogger.LogError(message);
+        }
+
+        public static void LogErrorFormat(string format, params object[] args)
+        {
+            PTThreadSafeLogger.LogErrorFormat(format, args);
+        }
+
+        public static void LogWarning(object message)
+        {
+            PTThreadSafeLogger.LogWarning(message);
+        }
+
+        public static void LogWarningFormat(string format, params object[] args)
+        {
+            PTThreadSafeLogger.LogWarningFormat(format, args);
+        }
+
+        public static void LogException(Exception exception)
+        {
+            PTThreadSafeLogger.LogException(exception);
         }
 
         public static void ClearTasks()
         {
-            PTController.Instance.Tasks.ClearTasks();
+            PTAddon.Instance.Controller.ResetCurrentTasks();
         }
 
-        public static void ClearTasks(PTGroup group)
+        public static void ClearTasks(PTTimePair startTime)
         {
-            PTController.Instance.Tasks.ClearTasks(group);
+            PTAddon.Instance.Controller.Tasks[startTime].ClearTasks();
         }
 
     }

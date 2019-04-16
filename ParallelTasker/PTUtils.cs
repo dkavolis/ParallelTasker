@@ -20,7 +20,7 @@ Copyright 2019, Daumantas Kavolis
 
 using System;
 using System.Collections.Generic;
-using UnityEngine;
+using System.Linq;
 
 namespace ParallelTasker
 {
@@ -29,6 +29,21 @@ namespace ParallelTasker
         public static T[] GetEnumValues<T>()
         {
             return (T[])Enum.GetValues(typeof(T));
+        }
+
+        public static Dictionary<T, string> GetEnumNameMap<T>()
+        {
+            return GetEnumValues<T>().ToDictionary(value => value, value => Enum.GetName(typeof(T), value));
+        }
+
+        public static List<PTTimePair> GetAllTimePairs()
+        {
+            return (from update in GetEnumValues<PTUpdateEvent>()from time in GetEnumValues<PTEventTime>()select new PTTimePair(update, time)).ToList();
+        }
+
+        public static Dictionary<K, T> SwapKeysValues<T, K>(this Dictionary<T, K> dictionary)
+        {
+            return dictionary.ToDictionary(kp => kp.Value, kp => kp.Key);
         }
     }
 }

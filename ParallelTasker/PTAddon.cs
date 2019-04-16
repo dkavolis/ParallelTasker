@@ -19,8 +19,10 @@ Copyright 2019, Daumantas Kavolis
  */
 
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace ParallelTasker
 {
@@ -32,70 +34,74 @@ namespace ParallelTasker
         public const string AssetBundleName = "ParallelTasker/Assets/synchronizers.pt";
         public static string RootPath = "GameData";
 
-        [SerializeField] private GameObject m_synchronizer = null;
-        private PTStartSynchronizer m_loopStart = null;
-        private PTEndSynchronizer m_loopEnd = null;
+        public bool ResetOnSceneChange
+        {
+            get;
+            set;
+        } = true;
 
-        public PTStartSynchronizer StartSynchronizer
+        [SerializeField] private GameObject m_synchronizer;
+
+        internal PTController Controller;
+        private Dictionary<PTEventTime, IPTSynchronizer> s_synchronizers;
+
+        public Dictionary<PTEventTime, IPTSynchronizer> Synchronizers
         {
             get
             {
-                return m_loopStart;
-            }
-        }
-
-        public PTEndSynchronizer EndSynchronizer
-        {
-            get
-            {
-                return m_loopEnd;
+                return s_synchronizers;
             }
         }
 
         protected override void OnAwake()
         {
             base.OnAwake();
+            s_synchronizers = new Dictionary<PTEventTime, IPTSynchronizer>();
 #if !UNITY
             RootPath = Path.Combine(KSPUtil.ApplicationRootPath, "GameData");
 #endif
-
-            SetupListener();
+            SceneManager.activeSceneChanged += OnSceneChange;
         }
 
-        private void SetupListener()
+        internal void OnSceneChange(Scene current, Scene next)
         {
-#if !UNITY
-            StartCoroutine(DoSetupListener());
-#endif
+            // in KSP scene changes are done through an intermediate loading buffer scene
+            if (!ResetOnSceneChange)return;
+            PTLogger.Debug($"Scene change: {current.name} -> {next.name}");
+            Controller?.ResetCurrentTasks();
         }
-
-#if !UNITY
-        private IEnumerator DoSetupListener()
-        {
-            while (HighLogic.LoadedScene == GameScenes.LOADING)
-                yield return null;
-            // have to wait until loaded otherwise this throws NRE
-            GameEvents.onLevelWasLoaded.Add(OnSceneChange);
-        }
-
-        internal void OnSceneChange(GameScenes scene)
-        {
-            if (PTController.ResetOnSceneChange)
-                PTController.ResetCurrentTasks();
-        }
-#endif
 
         private void Start()
         {
             Load();
+            Controller = new PTController();
 #if DEBUG_SYNCHRONIZATION
-            foreach (var group in PTUtils.GetEnumValues<PTGroup>())
+            Disposable<List<PTTask>> tasks = ListPool<PTTask>.Instance.BorrowDisposable();
+            foreach (var group in PTUtils.GetAllTimePairs())
             {
-                var task = new SimpleTask(group);
-                ParallelTasker.AddTask(group, task.OnInitialize, task.Execute, task.OnFinalize);
+                var task = new SimpleTask(group, group);
+                tasks.Value.Add(ParallelTasker.AddTask(group, group, task.OnInitialize, task.Execute, task.OnFinalize));
             }
+            StartCoroutine(WaitAndClearTasks(tasks));
 #endif
         }
+
+#if DEBUG_SYNCHRONIZATION
+        private static IEnumerator WaitAndClearTasks(Disposable<List<PTTask>> tasks)
+        {
+            var counter = 0;
+            while (counter++ < 20)
+            {
+                yield return new WaitForEndOfFrame();
+            }
+
+            foreach (var task in tasks.Value)
+            {
+                ParallelTasker.RemoveTask(task.EndTime, task);
+            }
+            tasks.Dispose();
+        }
+#endif
 
         private void Load()
         {
@@ -120,58 +126,19 @@ namespace ParallelTasker
                 PTLogger.Error("Could not load synchronizers");
                 return;
             }
+            m_synchronizer.SetActive(true);
 
-            m_loopStart = m_synchronizer.GetComponent<PTStartSynchronizer>();
-            m_loopEnd = m_synchronizer.GetComponent<PTEndSynchronizer>();
-            Setup();
-        }
-
-        private void Setup()
-        {
-            if (m_loopStart != null)
+            foreach (var sync in m_synchronizer.GetComponents<IPTSynchronizer>())
             {
-                m_loopStart.OnUpdate += PTController.Instance.UpdateStart;
-                m_loopStart.OnLateUpdate += PTController.Instance.LateUpdateStart;
-                m_loopStart.OnFixedUpdate += PTController.Instance.FixedUpdateStart;
+                PTLogger.Debug($"Adding {sync} to known synchronizers");
+                s_synchronizers.Add(sync.EventTime, sync);
             }
-            else
-            {
-                PTLogger.Error($"Failed to load {typeof(PTStartSynchronizer)}");
-            }
-
-            if (m_loopEnd != null)
-            {
-                m_loopEnd.OnUpdate += PTController.Instance.UpdateEnd;
-                m_loopEnd.OnLateUpdate += PTController.Instance.LateUpdateEnd;
-                m_loopEnd.OnFixedUpdate += PTController.Instance.FixedUpdateEnd;
-            }
-            else
-            {
-                PTLogger.Error($"Failed to load {typeof(PTEndSynchronizer)}");
-            }
-
-            m_synchronizer?.SetActive(true);
         }
 
         protected override void OnSingletonDestroy()
         {
-            var instance = PTController.Instance;
-            if (instance != null)
-            {
-                if (m_loopStart != null)
-                {
-                    m_loopStart.OnUpdate -= instance.UpdateStart;
-                    m_loopStart.OnLateUpdate -= instance.LateUpdateStart;
-                    m_loopStart.OnFixedUpdate -= instance.FixedUpdateStart;
-                }
-
-                if (m_loopEnd != null)
-                {
-                    m_loopEnd.OnUpdate -= instance.UpdateEnd;
-                    m_loopEnd.OnLateUpdate -= instance.LateUpdateEnd;
-                    m_loopEnd.OnFixedUpdate -= instance.FixedUpdateEnd;
-                }
-            }
+            SceneManager.activeSceneChanged -= OnSceneChange;
+            Controller.Dispose();
             base.OnSingletonDestroy();
         }
     }

@@ -19,101 +19,52 @@ Copyright 2019, Daumantas Kavolis
  */
 
 using System;
-using System.Collections.Generic;
 
 namespace ParallelTasker
 {
-    public class PTTaskList
-    {
-        private PTGroupDictList<PTTask> m_tasks = new PTGroupDictList<PTTask>();
-
-        public List<PTTask> this[PTGroup group]
-        {
-            get
-            {
-                return m_tasks[group];
-            }
-        }
-        public PTTaskList()
-        { }
-
-        public PTTask AddTask(PTGroup group, PTTask task)
-        {
-            m_tasks[group].Add(task);
-            return task;
-        }
-
-        public PTTask AddTask(PTGroup group, Func<object, object> main, uint period = 1)
-        {
-            return AddTask(group, PTTask.Get(null, main, null, period));
-        }
-
-        public PTTask AddTask(PTGroup group, Func<object> initialize, Func<object, object> main, uint period = 1)
-        {
-            return AddTask(group, PTTask.Get(initialize, main, null, period));
-        }
-
-        public PTTask AddTask(PTGroup group, Func<object> initialize, Func<object, object> main, Action<object> finalize, uint period = 1)
-        {
-            return AddTask(group, PTTask.Get(initialize, main, finalize, period));
-        }
-
-        public void ClearTasks()
-        {
-            foreach (var group in m_tasks.Keys)
-            {
-                ClearTasks(group);
-            }
-        }
-
-        public void ClearTasks(PTGroup group)
-        {
-            var tasks = m_tasks[group];
-            foreach (var task in tasks)
-                task.Release();
-            tasks.Clear();
-        }
-    }
-
     /// <summary>
     /// A container for ParallelTasker tasks
     /// </summary>
     public class PTTask
     {
-        private static ObjectPool<PTTask> s_pool = new ObjectPool<PTTask>(null, OnRelease);
+        private static readonly ObjectPool<PTTask> s_pool = new ObjectPool<PTTask>(() => new PTTask(), null, OnRelease);
         public Func<object> initialize;
         public Func<object, object> main;
         public Action<object> finalize;
         public uint period;
-        private uint counter;
-
-        public PTTask() : this(null, null, null)
-        { }
-        public PTTask(Func<object> initialize, Func<object, object> main, Action<object> finalize, uint period = 1)
+        public PTTimePair EndTime
         {
+            get;
+            internal set;
+        }
+        private uint m_counter;
+
+        public PTTask() : this(PTTimePair.DefaultUpdate, null, null, null)
+        { }
+
+        public PTTask(PTTimePair endTime, Func<object> initialize, Func<object, object> main, Action<object> finalize, uint period = 1)
+        {
+            this.EndTime = endTime;
             this.initialize = initialize;
             this.main = main;
             this.finalize = finalize;
             this.period = period;
-            counter = period;
+            m_counter = period;
         }
 
         public bool ShouldExecuteNext()
         {
-            return counter == period;
+            return m_counter == period;
         }
 
         internal bool ShouldExecute()
         {
-            if (counter == period)
+            if (m_counter == period)
             {
-                counter = 1;
+                m_counter = 1;
                 return true;
             }
-            else
-            {
-                counter++;
-            }
+            m_counter++;
             return false;
         }
 
@@ -125,14 +76,15 @@ namespace ParallelTasker
             task.period = 0;
         }
 
-        public static PTTask Get(Func<object> initialize, Func<object, object> main, Action<object> finalize, uint period = 1)
+        public static PTTask Borrow(PTTimePair endTime, Func<object> initialize, Func<object, object> main, Action<object> finalize, uint period = 1)
         {
-            var task = s_pool.Get();
+            var task = s_pool.Borrow();
             task.initialize = initialize;
             task.main = main;
             task.finalize = finalize;
             task.period = period;
-            task.counter = 1;
+            task.EndTime = endTime;
+            task.m_counter = 1;
             return task;
         }
 
@@ -147,25 +99,17 @@ namespace ParallelTasker
         }
     }
 
+    /// <inheritdoc />
     /// <summary>
     /// A container for enqueued ParallelTasker tasks
     /// </summary>
     public class PTThreadTask : PTTask
     {
-        public static ObjectPool<PTThreadTask> s_pool = new ObjectPool<PTThreadTask>(null, OnRelease);
-        public PTGroup group;
-        private object argument = null;
+        private static readonly ObjectPool<PTThreadTask> s_pool = new ObjectPool<PTThreadTask>(() => new PTThreadTask(), null, OnRelease);
+        private object argument;
 
-        public PTThreadTask() : this(null, null, null)
+        public PTThreadTask() : base()
         { }
-
-        public PTThreadTask(Func<object> initialize, Func<object, object> main, Action<object> finalize) : this(PTGroup.Update, initialize, main, finalize)
-        { }
-
-        public PTThreadTask(PTGroup group, Func<object> initialize, Func<object, object> main, Action<object> finalize) : base(initialize, main, finalize)
-        {
-            this.group = group;
-        }
 
         private static void OnRelease(PTThreadTask task)
         {
@@ -173,26 +117,24 @@ namespace ParallelTasker
             task.argument = null;
         }
 
-        public static PTThreadTask Get(PTGroup group)
+        public static PTThreadTask Borrow(PTTimePair endTime, PTTask task)
         {
-            var task = s_pool.Get();
-            task.group = group;
-            return task;
-        }
-
-        public static PTThreadTask Get(PTGroup group, PTTask task)
-        {
-            var ttask = s_pool.Get();
+            var ttask = s_pool.Borrow();
             ttask.initialize = task.initialize;
             ttask.main = task.main;
             ttask.finalize = task.finalize;
-            ttask.group = group;
+            ttask.EndTime = endTime;
             return ttask;
         }
 
         public override void Release()
         {
             s_pool.Release(this);
+        }
+
+        public static void Release(PTThreadTask task)
+        {
+            task.Release();
         }
 
         public PTThreadTask RunInitializer()
@@ -203,8 +145,8 @@ namespace ParallelTasker
             }
             catch (Exception ex)
             {
-                main = NoopMain;
-                finalize = NoopFinalizer;
+                main = null;
+                finalize = null;
                 PTLogger.Exception(ex);
             }
             return this;
@@ -218,8 +160,8 @@ namespace ParallelTasker
             }
             catch (Exception ex)
             {
-                finalize = NoopFinalizer;
-                PTController.Instance.Loggers[group].LogException(ex);
+                finalize = null;
+                PTThreadSafeLogger.LogException(ex);
             }
             return this;
         }
@@ -236,13 +178,5 @@ namespace ParallelTasker
             }
             Release();
         }
-
-        private static object NoopMain(object argument)
-        {
-            return null;
-        }
-
-        private static void NoopFinalizer(object argument)
-        { }
     }
 }

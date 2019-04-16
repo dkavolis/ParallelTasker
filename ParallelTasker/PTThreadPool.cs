@@ -23,54 +23,51 @@ using System.Threading;
 
 namespace ParallelTasker
 {
-    public class PTThreadPool
+    public class PTThreadPool : IDisposable
     {
 
-        private Thread[] m_threads;
+        private readonly Thread[] m_threads;
         private readonly object m_lock = new object();
-        private PTTaskQueue m_queue = new PTTaskQueue();
+        private readonly PTTaskQueue m_queue = new PTTaskQueue();
 
         public PTThreadPool() : this(Environment.ProcessorCount)
         { }
 
         public PTThreadPool(int number)
         {
-            PTLogger.Info($"Initializing threadpool with {number} threads.");
+            PTLogger.Info($"Initializing threadpool with {number.ToString()} threads.");
             m_threads = new Thread[number];
-            for (int i = 0; i < number; i++)
+            for (var i = 0; i < number; i++)
             {
                 m_threads[i] = new Thread(ExecuteTasks);
                 m_threads[i].Start();
             }
         }
 
-        public void Prioritize(PTGroup group)
+        public void Prioritize(PTTimePair eventTime)
         {
-            lock(m_lock)
-            {
-                m_queue.Priority = group;
-            }
+            m_queue.Priority = eventTime;
         }
 
         public void Enqueue(PTThreadTask task)
         {
-            Enqueue(task.group, task);
+            Enqueue(task.EndTime, task);
         }
 
-        public void Enqueue(PTGroup group, PTThreadTask task)
+        public void Enqueue(PTTimePair endTime, PTThreadTask task)
         {
             lock(m_lock)
             {
-                m_queue.Enqueue(group, task);
+                m_queue.Enqueue(endTime, task);
                 Monitor.Pulse(m_lock);
             }
         }
 
         private void ExecuteTasks()
         {
-            PTThreadTask task = null;
             while (true)
             {
+                PTThreadTask task;
                 lock(m_lock)
                 {
                     // wait for queue to fill
@@ -82,16 +79,21 @@ namespace ParallelTasker
 
                 if (task == null)
                     return;
-                PTController.EnqueueForFinalization(task.RunMainTask());
+                PTAddon.Instance.Controller.EnqueueForFinalization(task.RunMainTask());
             }
         }
 
-        ~PTThreadPool()
+        public void Stop()
         {
-            for (int i = 0; i < m_threads.Length; i++)
+            for (var i = 0; i < m_threads.Length; i++)
             {
-                Enqueue(PTGroup.Update, null);
+                Enqueue(PTTimePair.DefaultFixedUpdate, null);
             }
+        }
+
+        public void Dispose()
+        {
+            Stop();
         }
     }
 }
